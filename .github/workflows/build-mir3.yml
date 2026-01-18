@@ -1,1 +1,41 @@
+name: Build OpenWrt for MiR3
 
+on:
+  workflow_dispatch: # 允许手动点击按钮开始构建
+  push:
+    paths:
+      - '.config' # 当你在线修改 .config 文件时自动触发构建
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialization environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev
+
+      - name: Update & Install Feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Configuration
+        run: |
+          # 这一步会将你网页修改的配置应用到编译环境
+          make defconfig
+
+      - name: Download package
+        run: make download -j8
+
+      - name: Compile
+        run: make -j$(nproc) || make -j1 V=s
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiR3_Firmware
+          path: bin/targets/ramips/mt7620/*.bin

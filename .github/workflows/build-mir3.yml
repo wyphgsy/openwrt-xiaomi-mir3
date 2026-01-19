@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # 使用资源更多的 22.04 版本
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,10 +16,12 @@ jobs:
       - name: Prepare Environment
         run: |
           sudo apt-get update
-          # 注意：在 22.04 中，我们将 python3-distutils 替换为更通用的 python3-setuptools
           sudo apt-get install -y build-essential flex bison g++ gawk gcc-multilib g++-multilib \
           gettext git libncurses-dev libssl-dev python3-setuptools rsync unzip zlib1g-dev \
-          libglib2.0-dev libelf-dev qemu-utils
+          libglib2.0-dev libelf-dev qemu-utils device-tree-compiler
+          
+          # 修复旧版 OpenWrt 脚本对 'python' 命令的依赖
+          sudo ln -sf /usr/bin/python3 /usr/bin/python
 
       - name: Update & Install Feeds
         run: |
@@ -28,18 +30,21 @@ jobs:
 
       - name: Load Custom Configuration
         run: |
+          # 确保使用仓库根目录的 .config，如果没有则生成默认
           [ -e .config ] && echo "Using existing .config" || make defconfig
 
       - name: Download Library
         run: |
-          make download -j8
+          # 使用 FORCE=1 绕过旧版脚本对特定编译器版本的严格检查
+          make download -j8 FORCE=1
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
       - name: Compile Firmware
         run: |
-          # 针对旧版项目，初次编译建议限制线程数以防止内存溢出导致的任务崩溃
-          make -j$(nproc) || make -j1 V=s
+          echo -e "$(nproc) thread compile"
+          # 核心编译步骤，失败时切换到单线程输出详细错误日志
+          make -j$(nproc) FORCE=1 || make -j1 V=s FORCE=1
 
       - name: Upload Firmware
         uses: actions/upload-artifact@v4

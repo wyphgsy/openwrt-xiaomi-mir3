@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
-      - master
+      - 18.06.2
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04  # 使用资源更多的 22.04 版本
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,8 +16,9 @@ jobs:
       - name: Prepare Environment
         run: |
           sudo apt-get update
+          # 注意：在 22.04 中，我们将 python3-distutils 替换为更通用的 python3-setuptools
           sudo apt-get install -y build-essential flex bison g++ gawk gcc-multilib g++-multilib \
-          gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
+          gettext git libncurses-dev libssl-dev python3-setuptools rsync unzip zlib1g-dev \
           libglib2.0-dev libelf-dev qemu-utils
 
       - name: Update & Install Feeds
@@ -33,9 +33,12 @@ jobs:
       - name: Download Library
         run: |
           make download -j8
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
 
       - name: Compile Firmware
         run: |
+          # 针对旧版项目，初次编译建议限制线程数以防止内存溢出导致的任务崩溃
           make -j$(nproc) || make -j1 V=s
 
       - name: Upload Firmware
